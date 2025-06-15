@@ -172,17 +172,16 @@ static void GetS3Client(tf_s3_filesystem::S3File* s3_file) {
     Aws::SDKOptions options;
     Aws::InitAPI(options);
 
-    // The creation of S3Client disables virtual addressing:
-    //   S3Client(clientConfiguration, signPayloads, useVirtualAddressing =
-    //   true)
-    // The purpose is to address the issue encountered when there is an `.`
-    // in the bucket name. Due to TLS hostname validation or DNS rules,
-    // the bucket may not be resolved. Disabling of virtual addressing
-    // should address the issue. See GitHub issue 16397 for details.
+    bool use_virtual_addressing = false;
+    const char* addressing_style = getenv("S3_ADDRESSING_STYLE");
+    if (addressing_style && std::string(addressing_style) == "virtual") {
+      use_virtual_addressing = true;
+    }
+
     s3_file->s3_client = std::shared_ptr<Aws::S3::S3Client>(
         Aws::New<Aws::S3::S3Client>(
             kS3ClientAllocationTag, GetDefaultClientConfig(),
-            Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never, false),
+            Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never, use_virtual_addressing),
         [options](Aws::S3::S3Client* s3_client) {
           if (s3_client != nullptr) {
             Aws::Delete(s3_client);
